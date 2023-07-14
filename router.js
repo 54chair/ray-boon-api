@@ -3,6 +3,7 @@ const router = express.Router();
 const Joi = require('joi');
 const ExpressError = require('./utils/ExpressError')
 const generateExample = require("./generateExample");
+const getLangCode = require("./getLangCode");
 
 const timeout = require('connect-timeout');
 
@@ -64,21 +65,36 @@ router.post('/api', async (req, res, next) => {
     const result = await generateExample(apiKey, wordLang, wordName, wordMean);
     res.status(200).json(result);
   } catch (error) {
-    // パラメータが不足している場合のエラー処理
-    if (error.isJoi) {
-      const validationErrorMsg = error.details.map(details => details.message).join(',');
-      return next(new ExpressError(validationErrorMsg, 400));
-    // ChatGPTのAPIキーが間違っている場合のエラー処理
-    } else if (error.message === 'Request failed with status code 401') {
-      return next(new ExpressError('APIキーが間違っています', 401));
-    // ChatGPTのAPIキー無料枠が期限切れの場合のエラー処理
-    } else if (error.message = 'Request failed with status code 429'){
-      return next(new ExpressError('APIキーの無料枠が期限切れです', 401));
-    } else {
-      return next(error);
-    }
+    handleApiError(error, next)
   }
 });
+
+router.get("/lang-code", async (req, res, next) => {
+  try {
+    const { apiKey, wordLang } = req.body;
+    const result = await getLangCode(apiKey, wordLang);
+    res.status(200).json(result);
+  } catch (error) {
+    handleApiError(error, next);
+  }
+});
+
+// エラーハンドリングの共通処理
+const handleApiError = (error, next) => {
+  // パラメータが不足している場合のエラー処理
+  if (error.isJoi) {
+    const validationErrorMsg = error.details.map((details) => details.message).join(",");
+    return next(new ExpressError(validationErrorMsg, 400));
+    // ChatGPTのAPIキーが間違っている場合のエラー処理
+  } else if (error.message === "Request failed with status code 401") {
+    return next(new ExpressError("APIキーが間違っています", 401));
+    // ChatGPTのAPIキー無料枠が期限切れの場合のエラー処理
+  } else if ((error.message = "Request failed with status code 429")) {
+    return next(new ExpressError("APIキーの無料枠が期限切れです", 401));
+  } else {
+    return next(error);
+  }
+};
 
 // エラーハンドリングのミドルウェア
 const errorHandler = (err, req, res, next) => {
